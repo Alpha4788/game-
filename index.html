@@ -86,9 +86,6 @@
     margin-bottom:16px;
     box-shadow: 0 8px 20px rgba(95,64,35,.12);
   }
-
-  /* Solo mode: hide multiplayer player setup */
-  #playerPanel{ display:none; }
   .player-panel-head{
     display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
     margin-bottom:10px;
@@ -438,9 +435,126 @@
 </head>
 <body>
 
+<!-- =====================================================
+     SUPABASE CONFIG — EDIT ONLY THESE 2 LINES
+     ===================================================== -->
+<script>
+const SUPABASE_URL = "https://waqqcpqrnoxtnjhfnzlo.supabase.co/rest/v1/";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_DK2ImfnGhUwgpdTt5YD_7g_1KMJt-QZ";
+</script>
+
+<!-- Multiplayer room controls; original game UI remains unchanged -->
+<div id="multiplayerBar" style="max-width:1100px;margin:14px auto 0;padding:12px 16px;border:1px solid rgba(80,60,40,.16);border-radius:14px;background:rgba(255,255,255,.82);box-shadow:0 4px 18px rgba(60,40,20,.06);display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-family:inherit;">
+  <b>🎮 ห้อง 2 คน</b>
+  <button id="createRoomBtn" type="button">สร้างห้อง</button>
+  <input id="roomCodeInput" maxlength="6" placeholder="รหัสห้อง 6 ตัว" style="width:150px;text-transform:uppercase;padding:9px 11px;border:1px solid #d7c8b5;border-radius:9px;font:inherit;">
+  <button id="joinRoomBtn" type="button">เข้าร่วมห้อง</button>
+  <span id="roomStatus" style="font-weight:600;">กำลังเชื่อมต่อ...</span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+window.__MULTIPLAYER__ = { room:null, user:null, role:null, channel:null, applying:false };
+(async function initMultiplayer(){
+  const status = document.getElementById('roomStatus');
+  const setStatus = (t, cls='') => { status.textContent=t; status.className=cls; };
+  if(!SUPABASE_URL || SUPABASE_URL.includes('ใส่_') || !SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.includes('ใส่_')){
+    setStatus('⚠️ ใส่ Supabase URL + Publishable Key ก่อน'); return;
+  }
+  try {
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    window.__MULTIPLAYER__.sb = sb;
+    let {data:{session}} = await sb.auth.getSession();
+    if(!session){
+      const r = await sb.auth.signInAnonymously();
+      if(r.error) throw r.error;
+      session = r.data.session;
+    }
+    window.__MULTIPLAYER__.user = session.user;
+    setStatus('🟢 พร้อมสร้าง/เข้าห้อง');
+
+    document.getElementById('createRoomBtn').addEventListener('click', async ()=>{
+      const {data,error}=await sb.rpc('create_room',{p_player_id:session.user.id});
+      if(error){ console.error(error); setStatus('❌ สร้างห้องไม่สำเร็จ'); alert(error.message); return; }
+      const room = Array.isArray(data) ? data[0] : data;
+      await window.__setRoom(room);
+    });
+
+    document.getElementById('joinRoomBtn').addEventListener('click', async ()=>{
+      const code=document.getElementById('roomCodeInput').value.trim().toUpperCase();
+      if(code.length!==6){ alert('กรุณาใส่รหัสห้อง 6 ตัว'); return; }
+      const {data,error}=await sb.rpc('join_room',{p_room_code:code,p_player_id:session.user.id});
+      if(error){ console.error(error); setStatus('❌ '+error.message); alert(error.message); return; }
+      const room = Array.isArray(data) ? data[0] : data;
+      await window.__setRoom(room);
+    });
+
+    window.__setRoom = async function(room){
+      window.__MULTIPLAYER__.room=room;
+      const me=session.user.id;
+      window.__MULTIPLAYER__.role = room.player1_id===me ? 1 : (room.player2_id===me ? 2 : null);
+      document.getElementById('roomCodeInput').value=room.room_code || '';
+      setStatus('🏠 ห้อง '+room.room_code+' • '+(room.status==='playing'?'ผู้เล่นครบ 2 คน':'รอผู้เล่นคนที่ 2'));
+      await window.__subscribeRoom(room.room_code);
+      window.__applyRemoteState(room.game_state);
+    };
+
+    window.__subscribeRoom = async function(code){
+      if(window.__MULTIPLAYER__.channel) await sb.removeChannel(window.__MULTIPLAYER__.channel);
+      const ch=sb.channel('game-room-'+code);
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'game_rooms',filter:'room_code=eq.'+code},payload=>{
+        const row=payload.new; window.__MULTIPLAYER__.room=row;
+        setStatus('🏠 ห้อง '+row.room_code+' • '+(row.status==='playing'?'กำลังเล่น':'รอผู้เล่น'));
+        window.__applyRemoteState(row.game_state);
+      }).subscribe();
+      window.__MULTIPLAYER__.channel=ch;
+    };
+
+    window.__syncGameState = async function(){
+      const mp=window.__MULTIPLAYER__;
+      if(!mp.sb || !mp.room || !mp.user || mp.applying) return;
+      const state={
+        gameStarted: !!gameStarted,
+        turn: currentPlayerIndex,
+        current_question: currentPlayerIndex,
+        players: players.map((p,i)=>({id:i+1,name:p.name,position:p.position,correct:p.correct,wrong:p.wrong,finished:p.finished,color:p.color})),
+        finishOrder: finishOrder.map(Number)
+      };
+      const {data,error}=await mp.sb.from('game_rooms').update({game_state:state,status:allFinished()?'finished':(gameStarted?'playing':'waiting')}).eq('room_code',mp.room.room_code).select().single();
+      if(error) console.error('syncGameState',error); else mp.room=data;
+    };
+
+    window.__applyRemoteState = function(state){
+      const mp=window.__MULTIPLAYER__;
+      if(!state || !Array.isArray(state.players) || mp.applying) return;
+      mp.applying=true;
+      try{
+        const remote=state.players;
+        players=remote.slice(0,2).map((rp,i)=>({
+          id:i+1,name:rp.name||('ผู้เล่น '+(i+1)),position:Number(rp.position)||0,correct:Number(rp.correct)||0,wrong:Number(rp.wrong)||0,finished:!!rp.finished,color:rp.color||PLAYER_COLORS[i]
+        }));
+        while(players.length<2){ players.push({id:players.length+1,name:'ผู้เล่น '+(players.length+1),position:0,correct:0,wrong:0,finished:false,color:PLAYER_COLORS[players.length]}); }
+        nextPlayerId=3;
+        currentPlayerIndex=Math.min(1,Math.max(0,Number(state.turn)||0));
+        gameStarted=!!state.gameStarted;
+        finishOrder=Array.isArray(state.finishOrder)?state.finishOrder.map(Number):[];
+        if(gameStarted){
+          playerSetupControls.style.display='none'; playerPostControls.style.display='flex'; turnIndicator.style.display='flex';
+        }
+        renderPlayerList(); renderTokens(); updateTurnIndicator();
+        const myTurn=(mp.role===currentPlayerIndex+1);
+        answerBtn.disabled=!gameStarted || !myTurn || busy || allFinished();
+        answerBtn.textContent=myTurn?'ตอบคำถาม':'รออีกคนเล่น...';
+        if(mp.room && mp.room.status==='playing') setStatus('🏠 ห้อง '+mp.room.room_code+' • '+(myTurn?'ตาของคุณ':'รอผู้เล่นอีกคน'));
+      } finally { mp.applying=false; }
+    };
+  } catch(e){ console.error(e); setStatus('❌ Supabase เชื่อมต่อไม่ได้'); }
+})();
+</script>
+
 <div class="wrap">
   <div class="header">
-    <div class="eyebrow">เกมกระดาน เล่นคนเดียว</div>
+    <div class="eyebrow">เกมกระดาน หลายผู้เล่น</div>
     <h1>เกมเศรษฐี <span>ทุ่งทานตะวัน</span></h1>
     <button class="settings-btn" id="openSettingsBtn">⚙ ตั้งคำถามเอง</button>
   </div>
@@ -486,7 +600,7 @@
         <div class="center-content">
           <div class="center-card">
             <div class="center-title">🐻 ตอบคำถามให้ถูก เพื่อเดินหน้า 🌻</div>
-            <div class="center-sub">ตอบถูก → เดินหน้า 1 ช่อง&nbsp;|&nbsp;ตอบผิด → รอ 1 วินาที แล้วลองใหม่&nbsp;|&nbsp;ต้องตอบให้ครบเส้นชัยที่ช่อง 50</div>
+            <div class="center-sub">ตอบถูก → เดินหน้า 1 ช่อง&nbsp;|&nbsp;ตอบผิด → รอ 1 วินาที แล้วผลัดตาผู้เล่นถัดไป&nbsp;|&nbsp;ต้องตอบให้ครบเส้นชัยที่ช่อง 50</div>
             <button class="answer-btn" id="answerBtn">เริ่มเกมก่อนนะ</button>
             <div class="message" id="message"></div>
           </div>
@@ -499,7 +613,7 @@
 <!-- Question overlay -->
 <div class="overlay" id="overlay">
   <div class="qcard">
-    <div class="qlabel"><span class="dot" id="qPlayerDot"></span><span id="qPlayerName"></span> — คำถามประจำช่อง</div>
+    <div class="qlabel"><span class="dot" id="qPlayerDot"></span><span id="qPlayerName"></span> — ตอบคำถามนี้</div>
     <h2 id="qtext"></h2>
     <div class="options" id="options"></div>
     <div class="qfeedback" id="qfeedback"></div>
@@ -580,66 +694,31 @@
 
   // ---------- Default question bank ----------
   const DEFAULT_QUESTIONS = [
-    // ช่อง 1–10: ง่าย
-    { q:"ค่าเฉลี่ยคือค่ากลางของข้อมูลใช่หรือไม่", opts:["ใช่","ไม่ใช่","ขึ้นอยู่กับจำนวนข้อมูล","ไม่มีคำตอบ"], a:0 },
-    { q:"มัธยฐานคือค่าที่อยู่ตรงกลางใช่หรือไม่", opts:["ใช่","ไม่ใช่","คือค่าที่มากที่สุด","คือค่าที่น้อยที่สุด"], a:0 },
-    { q:"ฐานนิยมคือค่าที่พบมากที่สุดใช่หรือไม่", opts:["ใช่","ไม่ใช่","คือค่ากลาง","คือค่าที่มากที่สุดเสมอ"], a:0 },
-    { q:"ข้อมูลเชิงคุณภาพเป็นตัวเลขเสมอใช่หรือไม่", opts:["ใช่","ไม่ใช่","เฉพาะข้อมูลจากแบบสอบถาม","เฉพาะข้อมูลที่มีกราฟ"], a:1 },
-    { q:"ข้อมูลเชิงปริมาณสามารถนำมาคำนวณได้ใช่หรือไม่", opts:["ใช่","ไม่ใช่","เฉพาะข้อมูลสี","เฉพาะข้อมูลชื่อ"], a:0 },
-    { q:"กราฟแท่งใช้เปรียบเทียบข้อมูลได้ใช่หรือไม่", opts:["ใช่","ไม่ใช่","ใช้ได้เฉพาะเวลา","ใช้ได้เฉพาะข้อมูลคุณภาพ"], a:0 },
-    { q:"ค่าเฉลี่ยต้องเป็นจำนวนเต็มเสมอใช่หรือไม่", opts:["ใช่","ไม่ใช่","เฉพาะข้อมูลจำนวนเต็ม","เฉพาะข้อมูล 3 ค่า"], a:1 },
-    { q:"การเก็บข้อมูลจากทุกคนเรียกว่าสำมะโนใช่หรือไม่", opts:["ใช่","ไม่ใช่","เรียกว่าค่ากลาง","เรียกว่าการสุ่ม"], a:0 },
-    { q:"ความน่าจะเป็นมีค่าได้ตั้งแต่ 0 ถึง 1 ใช่หรือไม่", opts:["ใช่","ไม่ใช่","ตั้งแต่ -1 ถึง 1","ตั้งแต่ 1 ถึง 100"], a:0 },
-    { q:"การสุ่มคือการเลือกแบบไม่กำหนดล่วงหน้าใช่หรือไม่", opts:["ใช่","ไม่ใช่","ต้องเลือกคนแรกเสมอ","ต้องเลือกคนที่เก่งที่สุด"], a:0 },
-
-    // ช่อง 11–30: ปานกลาง
-    { q:"สถิติศาสตร์คืออะไร", opts:["ศาสตร์เกี่ยวกับการเก็บ วิเคราะห์ และแปลความหมายข้อมูล","ศาสตร์ที่ศึกษาเฉพาะการวาดกราฟ","การท่องจำตัวเลขทั้งหมด","การคำนวณเฉพาะจำนวนเต็ม"], a:0 },
-    { q:"ข้อใดเป็นข้อมูลเชิงปริมาณ", opts:["สีของรถ","จำนวนสมาชิกในห้อง","ยี่ห้อโทรศัพท์","ประเภทอาหารที่ชอบ"], a:1 },
-    { q:"ข้อใดเป็นข้อมูลเชิงคุณภาพ", opts:["ส่วนสูง","น้ำหนัก","สีของดอกไม้","คะแนนสอบ"], a:2 },
-    { q:"ค่าเฉลี่ย (Mean) คำนวณอย่างไร", opts:["ผลรวมของข้อมูลหารด้วยจำนวนข้อมูล","ค่าที่พบมากที่สุด","ค่าที่อยู่ตรงกลาง","ค่าสูงสุดลบค่าต่ำสุด"], a:0 },
-    { q:"มัธยฐาน (Median) ของข้อมูลที่เรียงลำดับแล้วคืออะไร", opts:["ค่าที่อยู่ตรงกลางของชุดข้อมูล","ผลรวมของข้อมูล","ค่าที่พบมากที่สุด","ค่าที่มากที่สุด"], a:0 },
-    { q:"ฐานนิยม (Mode) คืออะไร", opts:["ค่าที่พบซ้ำมากที่สุด","ค่าที่อยู่ตรงกลาง","ค่าเฉลี่ยของข้อมูล","ผลต่างระหว่างค่าสูงสุดกับต่ำสุด"], a:0 },
-    { q:"ทำไมต้องเก็บข้อมูล", opts:["เพื่อใช้วิเคราะห์และช่วยตัดสินใจ","เพื่อทำให้ข้อมูลมีจำนวนมากที่สุด","เพื่อให้ข้อมูลดูซับซ้อนขึ้น","เพื่อหลีกเลี่ยงการคำนวณ"], a:0 },
-    { q:"ข้อใดเป็นตัวอย่างการใช้สถิติในชีวิตประจำวัน", opts:["ดูคะแนนเฉลี่ยเพื่อประเมินผลการเรียน","เลือกสีโดยไม่ดูข้อมูล","เดาคำตอบทุกครั้ง","จำข้อมูลโดยไม่วิเคราะห์"], a:0 },
-    { q:"กราฟแท่งเหมาะกับการนำเสนอข้อมูลแบบใด", opts:["เปรียบเทียบค่าของแต่ละกลุ่ม","แสดงตำแหน่งพิกัดเท่านั้น","แสดงสมการอย่างเดียว","แสดงข้อความยาว ๆ"], a:0 },
-    { q:"กราฟวงกลมเหมาะกับการแสดงข้อมูลแบบใด", opts:["สัดส่วนของแต่ละส่วนเมื่อเทียบกับทั้งหมด","การเปลี่ยนแปลงตามเวลาอย่างละเอียด","ค่าความสูงของคนแต่ละคน","ขั้นตอนการคำนวณ"], a:0 },
-    { q:"Range (พิสัย) หาได้จากอะไร", opts:["ค่าสูงสุดลบค่าต่ำสุด","ค่าต่ำสุดลบค่าสูงสุด","ผลรวมหารจำนวนข้อมูล","ค่าที่พบมากที่สุด"], a:0 },
-    { q:"ถ้าข้อมูลมีค่าผิดปกติ (Outlier) มาก ควรพิจารณาค่ากลางใด", opts:["มัธยฐาน","ค่าเฉลี่ย","ค่าสูงสุด","พิสัย"], a:0 },
-    { q:"ความน่าจะเป็นหมายถึงอะไร", opts:["โอกาสที่เหตุการณ์หนึ่งจะเกิดขึ้น","จำนวนข้อมูลทั้งหมด","ค่าที่พบมากที่สุด","ผลรวมของข้อมูล"], a:0 },
-    { q:"ข้อใดเป็นเหตุการณ์ที่เป็นไปไม่ได้", opts:["ทอยลูกเต๋า 6 หน้าแล้วได้ 7","ทอยลูกเต๋าแล้วได้ 3","โยนเหรียญแล้วได้หัว","พรุ่งนี้มีพระอาทิตย์ขึ้น"], a:0 },
-    { q:"ข้อใดเป็นเหตุการณ์ที่แน่นอน", opts:["จำนวนจุดบนลูกเต๋า 6 หน้าเป็น 1 ถึง 6","ทอยลูกเต๋าแล้วได้ 7","โยนเหรียญแล้วได้ทั้งหัวและก้อยพร้อมกัน","สุ่มเลข 1–10 แล้วได้ 20"], a:0 },
-    { q:"การสุ่มตัวอย่างคืออะไร", opts:["การเลือกบางส่วนของประชากรเพื่อศึกษา","การเก็บข้อมูลจากทุกคนเสมอ","การเลือกเฉพาะคนที่รู้จัก","การลบข้อมูลที่ไม่ต้องการ"], a:0 },
-    { q:"การนับความถี่คืออะไร", opts:["การนับจำนวนครั้งที่ค่าหรือเหตุการณ์ปรากฏ","การหาค่าเฉลี่ย","การหาค่ามัธยฐาน","การเรียงข้อมูลจากมากไปน้อยเท่านั้น"], a:0 },
-    { q:"กราฟเส้นเหมาะกับข้อมูลแบบใด", opts:["ข้อมูลที่เปลี่ยนแปลงตามเวลา","ข้อมูลสีของเสื้อเท่านั้น","ข้อมูลชื่อคนเท่านั้น","ข้อมูลที่ไม่มีลำดับเวลา"], a:0 },
-    { q:"ทำไมต้องจัดระเบียบข้อมูลก่อนวิเคราะห์", opts:["เพื่อให้อ่าน เปรียบเทียบ และวิเคราะห์ได้ง่ายขึ้น","เพื่อเพิ่มจำนวนข้อมูล","เพื่อทำให้ข้อมูลถูกต้องโดยอัตโนมัติ","เพื่อไม่ต้องใช้กราฟ"], a:0 },
-    { q:"ข้อมูลช่วยในการตัดสินใจอย่างไร", opts:["ช่วยให้ตัดสินใจโดยมีหลักฐานและเหตุผลมากขึ้น","ทำให้ไม่ต้องคิดก่อนตัดสินใจ","ทำให้ทุกการตัดสินใจถูกต้อง 100%","ใช้แทนความคิดเห็นได้ทุกกรณี"], a:0 },
-
-    // ช่อง 31–50: ยากขึ้น
-    { q:"ค่าเฉลี่ยของ 2, 4, 6 คือ", opts:["3","4","5","6"], a:1 },
-    { q:"มัธยฐานของ 1, 3, 5 คือ", opts:["1","3","5","4"], a:1 },
-    { q:"ฐานนิยมของ 2, 2, 3 คือ", opts:["2","3","1","ไม่มี"], a:0 },
-    { q:"ข้อมูลใดเป็นเชิงคุณภาพ", opts:["อายุ","ส่วนสูง","สี","น้ำหนัก"], a:2 },
-    { q:"ข้อมูลใดเป็นเชิงปริมาณ", opts:["เพศ","สี","คะแนนสอบ","ประเภท"], a:2 },
-    { q:"กราฟวงกลมใช้แสดง", opts:["เวลา","สัดส่วน","ความเร็ว","ระยะทาง"], a:1 },
-    { q:"Range ของ 2, 5, 9 คือ", opts:["5","6","7","9"], a:2 },
-    { q:"ความน่าจะเป็นสูงสุดคือ", opts:["0","0.5","1","10"], a:2 },
-    { q:"เหตุการณ์ที่เป็นไปไม่ได้มีค่า", opts:["0","1","0.5","-1"], a:0 },
-    { q:"กราฟแท่งใช้", opts:["เปรียบเทียบ","วัดเวลา","วัดน้ำหนัก","วาดรูป"], a:0 },
-    { q:"ค่าเฉลี่ยของ 10, 20 คือ", opts:["10","15","20","25"], a:1 },
-    { q:"มัธยฐานของ 2, 4, 6, 8 คือ", opts:["4","5","6","8"], a:1 },
-    { q:"Mode ของ 1, 2, 3 คือ", opts:["1","2","3","ไม่มี"], a:3 },
-    { q:"ข้อใดคือการสุ่ม", opts:["เลือกเพื่อนสนิท","จับฉลาก","เลือกคนเก่ง","เลือกคนรู้จัก"], a:1 },
-    { q:"กราฟเส้นเหมาะกับ", opts:["เวลา","สี","เพศ","รูปภาพ"], a:0 },
-    { q:"ข้อมูลช่วยให้เรา", opts:["เดา","ตัดสินใจ","เล่นเกม","วาดรูป"], a:1 },
-    { q:"การเก็บข้อมูลจากบางส่วนเรียกว่า", opts:["สำมะโน","ตัวอย่าง","ค่ากลาง","กราฟ"], a:1 },
-    { q:"ค่าเฉลี่ยคือ", opts:["ค่าสูงสุด","ค่ากลาง","ค่าต่ำสุด","ค่าแรก"], a:1 },
-    { q:"Median คือ", opts:["ค่ามากสุด","ค่ากลาง","ค่าน้อยสุด","ค่าเฉลี่ย"], a:1 },
-    { q:"Mode คือ", opts:["ค่าที่พบมากสุด","ค่ากลาง","ค่าน้อยสุด","ค่าสุ่ม"], a:0 }
+    { q:'เมืองหลวงของประเทศไทยคือที่ใด?', opts:['เชียงใหม่','กรุงเทพมหานคร','ภูเก็ต','ขอนแก่น'], a:1 },
+    { q:'1 + 1 x 2 มีค่าเท่ากับเท่าใด?', opts:['4','3','2','6'], a:1 },
+    { q:'ดาวเคราะห์ดวงใดอยู่ใกล้ดวงอาทิตย์ที่สุด?', opts:['ดาวศุกร์','โลก','ดาวพุธ','ดาวอังคาร'], a:2 },
+    { q:'แม่น้ำสายใดยาวที่สุดในประเทศไทย?', opts:['แม่น้ำเจ้าพระยา','แม่น้ำโขง','แม่น้ำมูล','แม่น้ำปิง'], a:1 },
+    { q:'สัตว์ชนิดใดถือเป็นสัตว์ประจำชาติไทย?', opts:['เสือโคร่ง','ช้าง','สิงโต','ม้าลาย'], a:1 },
+    { q:'1 ปี มีกี่เดือน?', opts:['10 เดือน','12 เดือน','11 เดือน','13 เดือน'], a:1 },
+    { q:'ประเทศไทยมีกี่ภาค (แบ่งตามภูมิศาสตร์หลัก)?', opts:['4 ภาค','5 ภาค','6 ภาค','3 ภาค'], a:1 },
+    { q:'น้ำเดือดที่อุณหภูมิกี่องศาเซลเซียส (ที่ระดับน้ำทะเล)?', opts:['90 องศา','100 องศา','80 องศา','120 องศา'], a:1 },
+    { q:'ข้อใดคือสีธงชาติไทย?', opts:['แดง ขาว น้ำเงิน','เขียว ขาว แดง','ฟ้า ขาว เหลือง','แดง เหลือง ดำ'], a:0 },
+    { q:'สัตว์ในข้อใดวางไข่?', opts:['แมว','สุนัข','ไก่','ช้าง'], a:2 },
+    { q:'10 หาร 2 เท่ากับเท่าใด?', opts:['5','2','10','8'], a:0 },
+    { q:'ภูเขาที่สูงที่สุดในประเทศไทยคือภูเขาใด?', opts:['ดอยอินทนนท์','ดอยสุเทพ','เขาใหญ่','ภูกระดึง'], a:0 },
+    { q:'มนุษย์มีกระดูกซี่โครงกี่คู่โดยทั่วไป?', opts:['10 คู่','12 คู่','14 คู่','8 คู่'], a:1 },
+    { q:'ข้อใดคือเลขคี่?', opts:['8','12','15','20'], a:2 },
+    { q:'ประเทศไทยเคยใช้ชื่อว่าอะไรก่อนเปลี่ยนเป็น "ประเทศไทย"?', opts:['สยาม','ล้านนา','กรุงศรีอยุธยา','สุวรรณภูมิ'], a:0 },
+    { q:'พืชในข้อใดจัดเป็นพืชใบเลี้ยงเดี่ยว?', opts:['ข้าว','มะม่วง','ถั่ว','กุหลาบ'], a:0 },
+    { q:'ทวีปที่มีขนาดใหญ่ที่สุดในโลกคือทวีปใด?', opts:['แอฟริกา','เอเชีย','ยุโรป','อเมริกาใต้'], a:1 },
+    { q:'3 x 3 มีค่าเท่ากับเท่าใด?', opts:['6','9','12','3'], a:1 },
+    { q:'อวัยวะใดทำหน้าที่สูบฉีดเลือด?', opts:['ปอด','ตับ','หัวใจ','ไต'], a:2 },
+    { q:'หนึ่งสัปดาห์มีกี่วัน?', opts:['5 วัน','6 วัน','7 วัน','8 วัน'], a:2 }
   ];
   let customQuestions = [];
 
   const PLAYER_COLORS = ['#DD5C56','#5F8D4E','#3B7DAE','#9B6BC7','#E2933B','#4FA8A0'];
-  const MAX_PLAYERS = 6;
+  const MAX_PLAYERS = 2;
 
   // ---------- Game state ----------
   let players = [];      // {id,name,position,correct,wrong,finished,color}
@@ -803,6 +882,7 @@
     renderTokens();
     updateTurnIndicator();
     setMessage('เริ่มเกมแล้ว! ' + players[0].name + ' ตอบคำถามข้อแรกได้เลย', 'info');
+    if(window.__syncGameState) window.__syncGameState();
   });
 
   document.getElementById('editPlayersBtn').addEventListener('click', () => {
@@ -831,17 +911,11 @@
     renderPlayerList();
   }
 
-  // init solo mode automatically
+  // init with one default player
   players.push(makeDefaultPlayer());
-  players[0].name = 'ผู้เล่น';
-  gameStarted = true;
-  currentPlayerIndex = 0;
   renderPlayerList();
   renderTokens();
-  updateTurnIndicator();
-  answerBtn.disabled = false;
-  answerBtn.textContent = 'ตอบคำถาม';
-  setMessage('พร้อมเล่น! กด “ตอบคำถาม” เพื่อเริ่มเกม', 'info');
+  answerBtn.disabled = true;
 
   // ---------- Question flow ----------
   function activePool(){
@@ -852,12 +926,9 @@
     if(pool.length === 0) pool = DEFAULT_QUESTIONS;
     return pool;
   }
-  function questionForCurrentTile(){
-    const cp = players[currentPlayerIndex];
-    const useDefault = document.getElementById('useDefaultToggle').checked;
-    if(useDefault && DEFAULT_QUESTIONS[cp.position]) return DEFAULT_QUESTIONS[cp.position];
-    if(customQuestions.length) return customQuestions[cp.position % customQuestions.length];
-    return DEFAULT_QUESTIONS[cp.position] || DEFAULT_QUESTIONS[0];
+  function randomQuestion(){
+    const pool = activePool();
+    return pool[Math.floor(Math.random()*pool.length)];
   }
 
   function showOverlay(el){ el.classList.add('show'); }
@@ -865,15 +936,10 @@
 
   function openQuestion(){
     const cp = players[currentPlayerIndex];
-    qPlayerName.textContent = "ช่อง " + (cp.position + 1) + " — " + cp.name;
+    qPlayerName.textContent = cp.name;
     qPlayerDot.style.background = cp.color;
 
-    const q = questionForCurrentTile();
-    const qDifficulty = document.getElementById('qDifficulty');
-    if(qDifficulty){
-      const n = cp.position + 1;
-      qDifficulty.textContent = n <= 10 ? '• ง่าย' : (n <= 30 ? '• ปานกลาง' : '• ยาก');
-    }
+    const q = randomQuestion();
     qtext.textContent = q.q;
     qfeedback.textContent = '';
     qfeedback.className = 'qfeedback';
@@ -897,24 +963,12 @@
 
     if(pickedIdx === correctIdx){
       btnEl.classList.add('correct-pick');
-      qfeedback.textContent = (cp.position === TOTAL - 1) ? 'ถูกต้อง! 🎉 ผ่านเส้นชัยแล้ว' : 'ถูกต้อง! เดินหน้า 1 ช่อง';
+      qfeedback.textContent = 'ถูกต้อง! เดินหน้า 1 ช่อง';
       qfeedback.className = 'qfeedback correct';
       cp.correct++;
 
       await sleep(500);
       hideOverlay(overlay);
-
-      // ถ้าอยู่ช่อง 50 แล้วตอบถูก ให้จบเกมโดยไม่ต้องเดินต่อ
-      if(cp.position === TOTAL - 1){
-        cp.finished = true;
-        finishOrder.push(cp.id);
-        renderTokens();
-        renderPlayerList();
-        setMessage('🎉 ' + cp.name + ' ตอบคำถามช่อง 50 ถูกต้อง และเข้าเส้นชัยแล้ว!', 'correct');
-        await sleep(600);
-        nextTurn();
-        return;
-      }
 
       cp.position = Math.min(cp.position + 1, TOTAL - 1);
       renderTokens();
@@ -922,9 +976,11 @@
       setMessage(cp.name + ' ตอบถูก! เดินไปช่อง ' + (cp.position+1), 'correct');
       await sleep(250);
 
-      // ช่อง 50 มีคำถามของตัวเองด้วย: ต้องตอบคำถามประจำช่อง 50 ให้ถูกจึงจะจบเกม
-      if(cp.position === TOTAL - 1){
-        setMessage('🌻 ถึงช่อง 50 แล้ว! ตอบคำถามประจำช่องสุดท้ายเพื่อเข้าเส้นชัย', 'correct');
+      if(cp.position >= TOTAL - 1 && !cp.finished){
+        cp.finished = true;
+        finishOrder.push(cp.id);
+        setMessage('🎉 ' + cp.name + ' เดินครบ ' + TOTAL + ' ช่องแล้ว!', 'correct');
+        await sleep(600);
       }
     } else {
       btnEl.classList.add('wrong-pick');
@@ -951,6 +1007,7 @@
     if(allFinished()){
       busy = false;
       answerBtn.disabled = true;
+      if(window.__syncGameState) window.__syncGameState();
       showFinalOverlay();
       return;
     }
@@ -962,11 +1019,15 @@
     updateTurnIndicator();
     renderTokens();
     busy = false;
-    answerBtn.disabled = false;
+    const myTurn = !window.__MULTIPLAYER__.room || window.__MULTIPLAYER__.role === currentPlayerIndex + 1;
+    answerBtn.disabled = !myTurn;
+    answerBtn.textContent = myTurn ? 'ตอบคำถาม' : 'รออีกคนเล่น...';
+    if(window.__syncGameState) window.__syncGameState();
   }
 
   answerBtn.addEventListener('click', () => {
     if(busy || !gameStarted) return;
+    if(window.__MULTIPLAYER__.room && window.__MULTIPLAYER__.role !== currentPlayerIndex + 1) return;
     if(allFinished()) return;
     busy = true;
     answerBtn.disabled = true;
@@ -1016,6 +1077,7 @@
     renderTokens();
     renderPlayerList();
     updateTurnIndicator();
+    if(window.__syncGameState) window.__syncGameState();
   });
 
   function escapeHtml(str){
