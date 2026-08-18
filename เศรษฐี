@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เกมเศรษฐี ทุ่งทานตะวัน — ตอบคำถามเดินบอร์ด</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sand: #EAD1A0;
+    --sand-deep: #C99A5E;
+    --sand-dark: #B07F41;
+    --wood: #8B6239;
+    --wood-dark: #5F4023;
+    --rose: #F4BEC1;
+    --rose-deep: #EC9498;
+    --coral: #DD5C56;
+    --coral-deep: #C4433D;
+    --cream: #FFF8EC;
+    --ink: #4A2E22;
+    --ink-soft: #8A6748;
+    --leaf: #7FAF63;
+    --leaf-deep: #5C8C46;
+    --sun: #F6D66B;
+    --mush-red: #D6524B;
+    --success: #5F8D4E;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 50% -10%, #F3DCB0 0%, var(--sand) 55%, var(--sand-deep) 100%);
+    font-family:'Sarabun', sans-serif;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px 16px;
+  }
+
+  .wrap{ width:100%; max-width:980px; }
+
+  .header{ text-align:center; margin-bottom:16px; }
+  .header .eyebrow{
+    font-family:'Kanit', sans-serif;
+    font-size:13px;
+    letter-spacing:.28em;
+    color:var(--coral-deep);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .header h1{
+    font-family:'Kanit', sans-serif;
+    font-weight:800;
+    font-size:clamp(26px, 4.6vw, 40px);
+    color:var(--wood-dark);
+    margin:0;
+    letter-spacing:.01em;
+    text-shadow: 0 2px 0 rgba(255,255,255,.35);
+  }
+  .header h1 span{ color:var(--coral-deep); }
+
+  .settings-btn{
+    font-family:'Kanit', sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    background: rgba(221,92,86,.12);
+    border:1px solid rgba(221,92,86,.5);
+    color:var(--coral-deep);
+    border-radius:999px;
+    padding:8px 16px;
+    cursor:pointer;
+    margin-top:12px;
+    transition: background .15s ease;
+  }
+  .settings-btn:hover{ background: rgba(221,92,86,.22); }
+
+  /* ---------- Player panel ---------- */
+  .player-panel{
+    background: linear-gradient(160deg, #FBF1DC, #F3E1B8);
+    border:1.5px solid rgba(139,98,57,.35);
+    border-radius:16px;
+    padding:16px 18px;
+    margin-bottom:16px;
+    box-shadow: 0 8px 20px rgba(95,64,35,.12);
+  }
+
+  /* Solo mode: hide multiplayer player setup */
+  #playerPanel{ display:none; }
+  .player-panel-head{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
+    margin-bottom:10px;
+  }
+  .player-panel-head h2{
+    font-family:'Kanit', sans-serif; font-size:16px; font-weight:700; color:var(--wood-dark); margin:0;
+  }
+  .turn-indicator{
+    font-family:'Kanit', sans-serif; font-weight:700; font-size:13px;
+    background: rgba(255,255,255,.7); border-radius:999px; padding:6px 14px;
+    display:flex; align-items:center; gap:7px; color:var(--ink);
+  }
+  .turn-indicator .dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  .player-list{ display:flex; flex-direction:column; gap:8px; }
+  .player-row{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1.5px solid #E4C9A0; border-radius:10px; padding:8px 12px;
+    transition: box-shadow .15s ease, border-color .15s ease;
+  }
+  .player-row.current-turn{ border-color: var(--sun); box-shadow: 0 0 0 2px rgba(246,214,107,.6); }
+  .player-row.finished{ opacity:.72; }
+  .player-color-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+  .player-name-input{
+    flex:1; min-width:80px; font-family:'Sarabun', sans-serif; font-size:14px;
+    border:1px solid #E4C9A0; border-radius:7px; padding:6px 9px; color:var(--ink);
+  }
+  .player-name-static{ flex:1; font-family:'Kanit', sans-serif; font-weight:600; font-size:14px; color:var(--ink); }
+  .player-stats-inline{ font-family:'Kanit', sans-serif; font-size:12px; color:var(--ink-soft); white-space:nowrap; }
+  .player-stats-inline b{ color:var(--coral-deep); }
+  .remove-player-btn{
+    background:none; border:none; color:var(--coral-deep); font-size:16px; cursor:pointer; padding:2px 4px; flex-shrink:0;
+  }
+  .finished-badge{ font-size:13px; }
+
+  .player-setup-controls, .player-postgame-controls{
+    display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
+  }
+  .pbtn{
+    font-family:'Kanit', sans-serif; font-weight:600; font-size:13px;
+    border-radius:8px; padding:9px 16px; cursor:pointer; border:1.5px solid transparent;
+  }
+  .pbtn.add{ background:#fff; border-color:#E4C9A0; color:var(--ink); }
+  .pbtn.add:hover{ border-color:var(--coral); }
+  .pbtn.start{
+    background: linear-gradient(155deg, var(--sun), #E7B23E); color:#4A2E05;
+    box-shadow: 0 4px 0 #B37E1F;
+  }
+  .pbtn.start:active{ transform:translateY(3px); box-shadow:0 1px 0 #B37E1F; }
+  .pbtn.edit{ background:#fff; border-color:var(--coral); color:var(--coral-deep); }
+  .player-setup-msg{ font-size:12px; font-family:'Kanit', sans-serif; font-weight:600; color:var(--coral-deep); margin-top:6px; min-height:14px; }
+
+  /* ---------- Board ---------- */
+  .board-frame{
+    background: linear-gradient(160deg, #D9AF74, var(--sand-deep) 55%, var(--sand-dark));
+    border-radius:20px;
+    padding:14px;
+    box-shadow:
+      0 0 0 1px rgba(139,98,57,.5),
+      0 30px 60px -20px rgba(95,64,35,.55),
+      inset 0 0 30px rgba(95,64,35,.2);
+  }
+
+  .board{
+    display:grid;
+    grid-template-columns: repeat(15, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    gap:3px;
+    aspect-ratio: 15 / 12;
+    background: var(--wood-dark);
+    border-radius:12px;
+    padding:3px;
+  }
+
+  .tile{
+    background:var(--rose);
+    border:1.5px solid var(--coral);
+    border-radius:6px;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-family:'Kanit', sans-serif;
+    font-size:clamp(6px, .95vw, 10px);
+    font-weight:700;
+    color:var(--wood-dark);
+    text-align:center;
+    line-height:1.1;
+    padding:2px;
+    overflow:hidden;
+  }
+  .tile.corner{
+    background:var(--wood);
+    color:var(--cream);
+    font-size:clamp(6px, 1.05vw, 10.5px);
+    border-color:var(--wood-dark);
+  }
+  .tile .idx{
+    position:absolute;
+    top:2px; left:3px;
+    font-size:6.5px;
+    color:rgba(74,46,34,.55);
+    font-weight:400;
+  }
+  .tile.corner .idx{ color:rgba(255,248,236,.6); }
+  .tile.active-tile{ box-shadow: inset 0 0 0 2px var(--sun); }
+
+  .token-holder{
+    position:absolute; bottom:1px; left:1px; right:1px;
+    display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:center;
+    gap:1px; z-index:5;
+  }
+  .ptoken{
+    width:12px; height:12px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:7px; font-weight:800; color:#fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.6);
+  }
+
+  .center{
+    grid-column: 2 / 15;
+    grid-row: 2 / 12;
+    border-radius:10px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    padding:14px;
+    position:relative;
+    overflow:hidden;
+    background: linear-gradient(180deg, #FBF1DC 0%, #F6E4BE 55%, #DCEBC4 100%);
+  }
+
+  .scene{ position:absolute; inset:0; pointer-events:none; z-index:0; }
+  .scene .sun{
+    position:absolute; top:-30px; right:6%;
+    width:90px; height:90px; border-radius:50%;
+    background: radial-gradient(circle, var(--sun), #F0C24B 70%);
+    box-shadow: 0 0 40px rgba(246,214,107,.6);
+    opacity:.8;
+  }
+  .scene .cloud{ position:absolute; background:#fff; border-radius:50px; opacity:.75; }
+  .scene .cloud1{ width:80px; height:26px; top:10%; left:6%; }
+  .scene .cloud1::before, .scene .cloud1::after{ content:''; position:absolute; background:#fff; border-radius:50%; }
+  .scene .cloud1::before{ width:36px; height:36px; top:-16px; left:8px; }
+  .scene .cloud1::after{ width:28px; height:28px; top:-12px; left:40px; }
+  .scene .cloud2{ width:60px; height:20px; top:22%; right:20%; }
+  .scene .cloud2::before{ content:''; position:absolute; width:26px; height:26px; background:#fff; border-radius:50%; top:-12px; left:16px; }
+  .scene .hill{
+    position:absolute; bottom:0; left:0; right:0; height:34%;
+    background: linear-gradient(180deg, var(--leaf), var(--leaf-deep));
+    border-radius:50% 50% 0 0 / 30px 30px 0 0;
+    opacity:.85;
+  }
+  .scene .mushroom{ position:absolute; bottom:6%; right:8%; width:70px; }
+  .scene .flower{ position:absolute; bottom:4%; }
+  .scene .flower1{ left:8%; } .scene .flower2{ left:16%; } .scene .flower3{ left:24%; }
+
+  .center-content{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:12px; }
+
+  .center-card{
+    background: rgba(255,248,236,.9);
+    border:1.5px solid rgba(139,98,57,.35);
+    border-radius:14px;
+    padding:16px 20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+    box-shadow: 0 8px 20px rgba(95,64,35,.15);
+  }
+
+  .center-title{
+    font-family:'Kanit', sans-serif;
+    color:var(--coral-deep);
+    font-weight:800;
+    font-size:clamp(16px, 2.4vw, 22px);
+    letter-spacing:.02em;
+    text-align:center;
+  }
+  .center-sub{
+    font-size:clamp(10.5px, 1.4vw, 13px);
+    color:var(--ink-soft);
+    text-align:center;
+    max-width:300px;
+    margin-top:-6px;
+  }
+
+  .answer-btn{
+    font-family:'Kanit', sans-serif;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:.02em;
+    background: linear-gradient(155deg, var(--sun), #E7B23E);
+    color:#4A2E05;
+    border:none;
+    border-radius:10px;
+    padding:14px 30px;
+    cursor:pointer;
+    box-shadow: 0 6px 0 #B37E1F, 0 10px 18px rgba(95,64,35,.3);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .answer-btn:active{ transform: translateY(4px); box-shadow: 0 2px 0 #B37E1F, 0 4px 10px rgba(95,64,35,.25); }
+  .answer-btn:disabled{
+    opacity:.5; cursor:not-allowed;
+    box-shadow: 0 6px 0 #999;
+    background: linear-gradient(155deg, #d8d8d8, #b3b3b3);
+  }
+
+  .message{ min-height:20px; font-family:'Kanit', sans-serif; font-weight:600; font-size:13px; text-align:center; }
+  .message.wrong{ color:var(--coral-deep); }
+  .message.correct{ color:var(--success); }
+  .message.info{ color:var(--ink-soft); }
+
+  /* Generic overlay */
+  .overlay{
+    position:fixed; inset:0; background: rgba(74,46,34,.6); backdrop-filter: blur(2px);
+    display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;
+    opacity:0; pointer-events:none; transition: opacity .2s ease;
+  }
+  .overlay.show{ opacity:1; pointer-events:auto; }
+
+  .qcard{
+    background: linear-gradient(165deg, var(--cream), #F3E5C6);
+    border-radius:16px; max-width:440px; width:100%; padding:26px 24px;
+    box-shadow: 0 0 0 1px rgba(221,92,86,.45), 0 30px 60px rgba(74,46,34,.4);
+    transform: translateY(10px) scale(.97); transition: transform .25s ease;
+  }
+  .overlay.show .qcard{ transform: translateY(0) scale(1); }
+  .qcard .qlabel{
+    font-family:'Kanit', sans-serif; font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--coral-deep); font-weight:700; margin-bottom:6px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .qcard .qlabel .dot{ width:9px; height:9px; border-radius:50%; }
+  .qcard h2{ font-family:'Kanit', sans-serif; font-size:19px; font-weight:700; margin:0 0 18px 0; color:var(--ink); line-height:1.4; }
+  .options{ display:flex; flex-direction:column; gap:9px; }
+  .opt-btn{
+    text-align:left; font-family:'Sarabun', sans-serif; font-size:14.5px; font-weight:500;
+    background:#fff; border:1.5px solid #E4C9A0; border-radius:9px; padding:11px 14px;
+    cursor:pointer; color:var(--ink); transition: background .15s ease, border-color .15s ease;
+  }
+  .opt-btn:hover:not(:disabled){ border-color: var(--coral); background:#FFF6EE; }
+  .opt-btn:disabled{ cursor:not-allowed; }
+  .opt-btn.correct-pick{ background:#E1F0D9; border-color:var(--success); }
+  .opt-btn.wrong-pick{ background:#FBE1DF; border-color:var(--coral-deep); }
+  .qfeedback{ margin-top:14px; font-family:'Kanit', sans-serif; font-weight:600; font-size:14px; min-height:18px; }
+  .qfeedback.correct{ color:var(--success); }
+  .qfeedback.wrong{ color:var(--coral-deep); }
+
+  /* Win overlay */
+  .win-overlay{
+    position:fixed; inset:0;
+    background: radial-gradient(circle at 50% 40%, #FBE9C6, #E9C583);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    z-index:80; opacity:0; pointer-events:none; transition: opacity .3s ease; text-align:center; padding:20px;
+  }
+  .win-overlay.show{ opacity:1; pointer-events:auto; }
+  .win-overlay h2{
+    font-family:'Kanit', sans-serif; font-weight:800; font-size:clamp(30px, 6vw, 48px);
+    color:var(--coral-deep); margin:0; text-shadow:0 3px 0 rgba(255,255,255,.5);
+  }
+  .leaderboard{
+    background: rgba(255,255,255,.85); border-radius:14px; padding:14px 18px;
+    display:flex; flex-direction:column; gap:8px; max-width:420px; width:100%;
+    max-height:40vh; overflow-y:auto; position:relative; z-index:2;
+  }
+  .lb-row{ display:flex; align-items:center; gap:10px; font-family:'Kanit', sans-serif; font-size:14px; color:var(--ink); }
+  .lb-rank{ font-weight:800; color:var(--coral-deep); width:22px; text-align:center; }
+  .lb-dot{ width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .lb-name{ flex:1; text-align:left; font-weight:600; }
+  .lb-stats{ font-size:12px; color:var(--ink-soft); }
+  .confetti{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  .confetti span{ position:absolute; top:-20px; width:8px; height:14px; border-radius:2px; animation: fall linear infinite; }
+  @keyframes fall{ to{ transform: translateY(110vh) rotate(360deg); } }
+  .again-btn{
+    font-family:'Kanit', sans-serif; font-weight:700; font-size:15px;
+    background: linear-gradient(155deg, var(--sun), #E7B23E); color:#4A2E05; border:none;
+    border-radius:10px; padding:13px 28px; cursor:pointer; box-shadow: 0 6px 0 #B37E1F;
+    position:relative; z-index:2;
+  }
+  .again-btn:active{ transform:translateY(3px); box-shadow:0 3px 0 #B37E1F; }
+
+  /* Settings overlay (question editor) */
+  .settings-card{
+    background: linear-gradient(165deg, var(--cream), #F3E5C6);
+    border-radius:16px; max-width:560px; width:100%; max-height:86vh; overflow-y:auto;
+    padding:26px 24px 22px; box-shadow: 0 0 0 1px rgba(221,92,86,.45), 0 30px 60px rgba(74,46,34,.4);
+  }
+  .settings-card h2{ font-family:'Kanit', sans-serif; font-weight:700; font-size:20px; margin:0 0 4px 0; color:var(--ink); }
+  .settings-card .settings-desc{ font-size:13px; color:var(--ink-soft); margin:0 0 18px 0; line-height:1.5; }
+  .field-label{ font-family:'Kanit', sans-serif; font-size:12px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px; display:block; }
+  .qinput, .opt-input, textarea.raw{
+    width:100%; font-family:'Sarabun', sans-serif; font-size:14px; padding:9px 11px;
+    border:1.5px solid #E4C9A0; border-radius:8px; background:#fff; color:var(--ink);
+  }
+  .opt-row{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .opt-row input[type=radio]{ accent-color: var(--success); flex-shrink:0; }
+  .opt-row .opt-input{ flex:1; }
+  .add-q-btn{
+    font-family:'Kanit', sans-serif; font-weight:700; font-size:14px; background: var(--success);
+    color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; margin-top:8px;
+  }
+  .add-q-btn:hover{ opacity:.92; }
+  .toggle-row{
+    display:flex; align-items:center; gap:8px; margin:16px 0 4px;
+    font-family:'Kanit', sans-serif; font-size:13px; font-weight:600; color:var(--ink);
+  }
+  .toggle-row input{ accent-color: var(--success); width:16px; height:16px; }
+  .divider{ border:none; border-top:1px solid #E4C9A0; margin:20px 0; }
+  .qlist{ display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; margin-top:8px; }
+  .qlist-empty{ font-size:13px; color:var(--ink-soft); font-style:italic; }
+  .qlist-item{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    background:#fff; border:1px solid #E4C9A0; border-radius:8px; padding:9px 11px; font-size:13px;
+  }
+  .qlist-item .qtxt{ line-height:1.4; }
+  .qlist-item .qtxt small{ display:block; color:var(--success); font-weight:600; margin-top:2px; }
+  .qlist-item .del-btn{ background:none; border:none; color:var(--coral-deep); cursor:pointer; font-size:16px; line-height:1; padding:2px 4px; flex-shrink:0; }
+  .io-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .io-btn{
+    font-family:'Kanit', sans-serif; font-weight:600; font-size:12.5px; background:#fff;
+    border:1.5px solid #E4C9A0; color:var(--ink); border-radius:8px; padding:9px 14px; cursor:pointer;
+  }
+  .io-btn:hover{ border-color: var(--coral); }
+  textarea.raw{ margin-top:8px; min-height:70px; resize:vertical; font-family: monospace; font-size:12px; }
+  .io-msg{ font-size:12px; font-family:'Kanit', sans-serif; font-weight:600; margin-top:6px; min-height:14px; }
+  .io-msg.ok{ color:var(--success); }
+  .io-msg.err{ color:var(--coral-deep); }
+  .close-settings{
+    font-family:'Kanit', sans-serif; font-weight:700; font-size:14px;
+    background: linear-gradient(155deg, var(--sun), #E7B23E); color:#4A2E05; border:none;
+    border-radius:8px; padding:11px 20px; cursor:pointer; margin-top:20px; width:100%;
+  }
+
+  @media (max-width: 640px){
+    .center-sub{ display:none; }
+    .scene .mushroom{ width:50px; }
+    .player-stats-inline{ display:block; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .confetti span{ animation:none; display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="header">
+    <div class="eyebrow">เกมกระดาน เล่นคนเดียว</div>
+    <h1>เกมเศรษฐี <span>ทุ่งทานตะวัน</span></h1>
+    <button class="settings-btn" id="openSettingsBtn">⚙ ตั้งคำถามเอง</button>
+  </div>
+
+  <div class="player-panel" id="playerPanel">
+    <div class="player-panel-head">
+      <h2>ผู้เล่น</h2>
+      <div class="turn-indicator" id="turnIndicator" style="display:none;"></div>
+    </div>
+    <div class="player-list" id="playerList"></div>
+    <div class="player-setup-controls" id="playerSetupControls">
+      <button class="pbtn add" id="addPlayerBtn">+ เพิ่มผู้เล่น</button>
+      <button class="pbtn start" id="startGameBtn">เริ่มเกม ▶</button>
+    </div>
+    <div class="player-postgame-controls" id="playerPostControls" style="display:none;">
+      <button class="pbtn edit" id="editPlayersBtn">แก้ไขผู้เล่น (เริ่มใหม่ทั้งหมด)</button>
+    </div>
+    <div class="player-setup-msg" id="playerSetupMsg"></div>
+  </div>
+
+  <div class="board-frame">
+    <div class="board" id="board">
+      <div class="center" id="center">
+        <div class="scene">
+          <div class="sun"></div>
+          <div class="cloud cloud1"></div>
+          <div class="cloud cloud2"></div>
+          <div class="hill"></div>
+          <svg class="mushroom" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="50" cy="72" rx="20" ry="22" fill="#FFF6E8"/>
+            <rect x="42" y="80" width="6" height="6" fill="#B5702F"/>
+            <path d="M50 70 a30 26 0 0 1 -30 -26 a30 20 0 0 1 60 0 a30 26 0 0 1 -30 26z" fill="#D6524B"/>
+            <circle cx="34" cy="42" r="4.5" fill="#FFF6E8"/>
+            <circle cx="50" cy="34" r="5.5" fill="#FFF6E8"/>
+            <circle cx="65" cy="44" r="4" fill="#FFF6E8"/>
+            <circle cx="50" cy="52" r="4" fill="#FFF6E8"/>
+          </svg>
+          <svg class="flower flower1" width="26" height="26" viewBox="0 0 40 40"><circle cx="20" cy="20" r="7" fill="#8B5A2B"/><g fill="#F6D66B"><circle cx="20" cy="6" r="6"/><circle cx="20" cy="34" r="6"/><circle cx="6" cy="20" r="6"/><circle cx="34" cy="20" r="6"/></g></svg>
+          <svg class="flower flower2" width="20" height="20" viewBox="0 0 40 40"><circle cx="20" cy="20" r="7" fill="#8B5A2B"/><g fill="#F6D66B"><circle cx="20" cy="6" r="6"/><circle cx="20" cy="34" r="6"/><circle cx="6" cy="20" r="6"/><circle cx="34" cy="20" r="6"/></g></svg>
+          <svg class="flower flower3" width="24" height="24" viewBox="0 0 40 40"><circle cx="20" cy="20" r="7" fill="#8B5A2B"/><g fill="#F6D66B"><circle cx="20" cy="6" r="6"/><circle cx="20" cy="34" r="6"/><circle cx="6" cy="20" r="6"/><circle cx="34" cy="20" r="6"/></g></svg>
+        </div>
+
+        <div class="center-content">
+          <div class="center-card">
+            <div class="center-title">🐻 ตอบคำถามให้ถูก เพื่อเดินหน้า 🌻</div>
+            <div class="center-sub">ตอบถูก → เดินหน้า 1 ช่อง&nbsp;|&nbsp;ตอบผิด → รอ 1 วินาที แล้วลองใหม่&nbsp;|&nbsp;ต้องตอบให้ครบเส้นชัยที่ช่อง 50</div>
+            <button class="answer-btn" id="answerBtn">เริ่มเกมก่อนนะ</button>
+            <div class="message" id="message"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Question overlay -->
+<div class="overlay" id="overlay">
+  <div class="qcard">
+    <div class="qlabel"><span class="dot" id="qPlayerDot"></span><span id="qPlayerName"></span> — คำถามประจำช่อง</div>
+    <h2 id="qtext"></h2>
+    <div class="options" id="options"></div>
+    <div class="qfeedback" id="qfeedback"></div>
+  </div>
+</div>
+
+<!-- Win / final overlay -->
+<div class="win-overlay" id="winOverlay">
+  <div class="confetti" id="confetti"></div>
+  <h2 id="winTitle">เย้! เกมจบแล้ว 🎉</h2>
+  <div class="leaderboard" id="leaderboard"></div>
+  <button class="again-btn" id="againBtn">เล่นใหม่ (รีเซ็ตคะแนน)</button>
+</div>
+
+<!-- Settings overlay (custom questions) -->
+<div class="overlay" id="settingsOverlay">
+  <div class="settings-card">
+    <h2>ตั้งคำถามของคุณเอง</h2>
+    <p class="settings-desc">เพิ่มคำถามแบบเลือกตอบ 4 ตัวเลือกได้ตามต้องการ คำถามที่เพิ่มจะถูกใช้ระหว่างเล่นรอบนี้ ถ้าต้องการเก็บไว้ใช้ครั้งหน้า ให้กด "คัดลอกชุดคำถาม" แล้วเก็บข้อความไว้ ครั้งหน้าค่อยวางกลับเข้าช่อง "นำเข้า"</p>
+
+    <label class="field-label">คำถาม</label>
+    <input type="text" class="qinput" id="newQText" placeholder="เช่น เมืองหลวงของไทยคือที่ใด?">
+
+    <label class="field-label">ตัวเลือก (เลือกวงกลมหน้าข้อที่ถูก)</label>
+    <div class="opt-row"><input type="radio" name="newQCorrect" value="0" checked><input type="text" class="opt-input" id="newOpt0" placeholder="ตัวเลือกที่ 1"></div>
+    <div class="opt-row"><input type="radio" name="newQCorrect" value="1"><input type="text" class="opt-input" id="newOpt1" placeholder="ตัวเลือกที่ 2"></div>
+    <div class="opt-row"><input type="radio" name="newQCorrect" value="2"><input type="text" class="opt-input" id="newOpt2" placeholder="ตัวเลือกที่ 3"></div>
+    <div class="opt-row"><input type="radio" name="newQCorrect" value="3"><input type="text" class="opt-input" id="newOpt3" placeholder="ตัวเลือกที่ 4"></div>
+
+    <button class="add-q-btn" id="addQBtn">+ เพิ่มคำถามนี้</button>
+    <div class="io-msg" id="addQMsg"></div>
+
+    <label class="toggle-row"><input type="checkbox" id="useDefaultToggle" checked> ใช้ชุดคำถามเริ่มต้นร่วมด้วย</label>
+
+    <hr class="divider">
+
+    <label class="field-label">คำถามที่คุณเพิ่ม (<span id="customCountLabel">0</span>)</label>
+    <div class="qlist" id="qlist"><div class="qlist-empty">ยังไม่มีคำถามที่เพิ่มเอง</div></div>
+
+    <hr class="divider">
+
+    <label class="field-label">นำเข้า / ส่งออกชุดคำถาม (ข้อความ JSON)</label>
+    <div class="io-row">
+      <button class="io-btn" id="exportBtn">คัดลอกชุดคำถามที่เพิ่มเอง</button>
+      <button class="io-btn" id="importBtn">นำเข้าจากช่องด้านล่าง</button>
+      <button class="io-btn" id="clearBtn">ล้างคำถามที่เพิ่มเองทั้งหมด</button>
+    </div>
+    <textarea class="raw" id="rawArea" placeholder='วางข้อความ JSON ที่คัดลอกไว้ตรงนี้แล้วกด "นำเข้า"'></textarea>
+    <div class="io-msg" id="ioMsg"></div>
+
+    <button class="close-settings" id="closeSettingsBtn">ปิด แล้วกลับไปเล่นเกม</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- Tile data (50 tiles: 15x12 perimeter) ----------
+  const TOTAL = 50;
+  const CORNER_NAMES = { 0:'เริ่มต้น', 14:'หลงทาง!', 25:'โบนัส!', 39:'กลับบ้าน' };
+  const PROVINCES = [
+    'เชียงใหม่','เชียงราย','แม่ฮ่องสอน','ลำปาง','ลำพูน','พะเยา','แพร่','น่าน','อุตรดิตถ์','พิษณุโลก','สุโขทัย','กำแพงเพชร','นครสวรรค์',
+    'อยุธยา','ลพบุรี','สระบุรี','นครราชสีมา','ขอนแก่น','อุดรธานี','หนองคาย','เลย','อุบลราชธานี','บุรีรัมย์',
+    'สุรินทร์','ศรีสะเกษ','ร้อยเอ็ด','มหาสารคาม','กาฬสินธุ์','สกลนคร','นครพนม','ยโสธร','ชัยภูมิ','กรุงเทพฯ','นนทบุรี','ปทุมธานี','สมุทรปราการ',
+    'ชลบุรี','ระยอง','จันทบุรี','ตราด','ฉะเชิงเทรา','กาญจนบุรี','ราชบุรี','เพชรบุรี','ประจวบคีรีขันธ์','ชุมพร'
+  ];
+  const CORNER_ICON = { 0:'🌻', 14:'😵', 25:'🎁', 39:'🏠' };
+
+  const tiles = [];
+  let pIdx = 0;
+  for(let i=0;i<TOTAL;i++){
+    if(CORNER_NAMES[i] !== undefined){
+      tiles.push({ name: CORNER_NAMES[i], corner:true, icon: CORNER_ICON[i] });
+    } else {
+      tiles.push({ name: PROVINCES[pIdx], corner:false });
+      pIdx++;
+    }
+  }
+
+  // ---------- Default question bank ----------
+  const DEFAULT_QUESTIONS = [
+    // ช่อง 1–10: ง่าย
+    { q:"ค่าเฉลี่ยคือค่ากลางของข้อมูลใช่หรือไม่", opts:["ใช่","ไม่ใช่","ขึ้นอยู่กับจำนวนข้อมูล","ไม่มีคำตอบ"], a:0 },
+    { q:"มัธยฐานคือค่าที่อยู่ตรงกลางใช่หรือไม่", opts:["ใช่","ไม่ใช่","คือค่าที่มากที่สุด","คือค่าที่น้อยที่สุด"], a:0 },
+    { q:"ฐานนิยมคือค่าที่พบมากที่สุดใช่หรือไม่", opts:["ใช่","ไม่ใช่","คือค่ากลาง","คือค่าที่มากที่สุดเสมอ"], a:0 },
+    { q:"ข้อมูลเชิงคุณภาพเป็นตัวเลขเสมอใช่หรือไม่", opts:["ใช่","ไม่ใช่","เฉพาะข้อมูลจากแบบสอบถาม","เฉพาะข้อมูลที่มีกราฟ"], a:1 },
+    { q:"ข้อมูลเชิงปริมาณสามารถนำมาคำนวณได้ใช่หรือไม่", opts:["ใช่","ไม่ใช่","เฉพาะข้อมูลสี","เฉพาะข้อมูลชื่อ"], a:0 },
+    { q:"กราฟแท่งใช้เปรียบเทียบข้อมูลได้ใช่หรือไม่", opts:["ใช่","ไม่ใช่","ใช้ได้เฉพาะเวลา","ใช้ได้เฉพาะข้อมูลคุณภาพ"], a:0 },
+    { q:"ค่าเฉลี่ยต้องเป็นจำนวนเต็มเสมอใช่หรือไม่", opts:["ใช่","ไม่ใช่","เฉพาะข้อมูลจำนวนเต็ม","เฉพาะข้อมูล 3 ค่า"], a:1 },
+    { q:"การเก็บข้อมูลจากทุกคนเรียกว่าสำมะโนใช่หรือไม่", opts:["ใช่","ไม่ใช่","เรียกว่าค่ากลาง","เรียกว่าการสุ่ม"], a:0 },
+    { q:"ความน่าจะเป็นมีค่าได้ตั้งแต่ 0 ถึง 1 ใช่หรือไม่", opts:["ใช่","ไม่ใช่","ตั้งแต่ -1 ถึง 1","ตั้งแต่ 1 ถึง 100"], a:0 },
+    { q:"การสุ่มคือการเลือกแบบไม่กำหนดล่วงหน้าใช่หรือไม่", opts:["ใช่","ไม่ใช่","ต้องเลือกคนแรกเสมอ","ต้องเลือกคนที่เก่งที่สุด"], a:0 },
+
+    // ช่อง 11–30: ปานกลาง
+    { q:"สถิติศาสตร์คืออะไร", opts:["ศาสตร์เกี่ยวกับการเก็บ วิเคราะห์ และแปลความหมายข้อมูล","ศาสตร์ที่ศึกษาเฉพาะการวาดกราฟ","การท่องจำตัวเลขทั้งหมด","การคำนวณเฉพาะจำนวนเต็ม"], a:0 },
+    { q:"ข้อใดเป็นข้อมูลเชิงปริมาณ", opts:["สีของรถ","จำนวนสมาชิกในห้อง","ยี่ห้อโทรศัพท์","ประเภทอาหารที่ชอบ"], a:1 },
+    { q:"ข้อใดเป็นข้อมูลเชิงคุณภาพ", opts:["ส่วนสูง","น้ำหนัก","สีของดอกไม้","คะแนนสอบ"], a:2 },
+    { q:"ค่าเฉลี่ย (Mean) คำนวณอย่างไร", opts:["ผลรวมของข้อมูลหารด้วยจำนวนข้อมูล","ค่าที่พบมากที่สุด","ค่าที่อยู่ตรงกลาง","ค่าสูงสุดลบค่าต่ำสุด"], a:0 },
+    { q:"มัธยฐาน (Median) ของข้อมูลที่เรียงลำดับแล้วคืออะไร", opts:["ค่าที่อยู่ตรงกลางของชุดข้อมูล","ผลรวมของข้อมูล","ค่าที่พบมากที่สุด","ค่าที่มากที่สุด"], a:0 },
+    { q:"ฐานนิยม (Mode) คืออะไร", opts:["ค่าที่พบซ้ำมากที่สุด","ค่าที่อยู่ตรงกลาง","ค่าเฉลี่ยของข้อมูล","ผลต่างระหว่างค่าสูงสุดกับต่ำสุด"], a:0 },
+    { q:"ทำไมต้องเก็บข้อมูล", opts:["เพื่อใช้วิเคราะห์และช่วยตัดสินใจ","เพื่อทำให้ข้อมูลมีจำนวนมากที่สุด","เพื่อให้ข้อมูลดูซับซ้อนขึ้น","เพื่อหลีกเลี่ยงการคำนวณ"], a:0 },
+    { q:"ข้อใดเป็นตัวอย่างการใช้สถิติในชีวิตประจำวัน", opts:["ดูคะแนนเฉลี่ยเพื่อประเมินผลการเรียน","เลือกสีโดยไม่ดูข้อมูล","เดาคำตอบทุกครั้ง","จำข้อมูลโดยไม่วิเคราะห์"], a:0 },
+    { q:"กราฟแท่งเหมาะกับการนำเสนอข้อมูลแบบใด", opts:["เปรียบเทียบค่าของแต่ละกลุ่ม","แสดงตำแหน่งพิกัดเท่านั้น","แสดงสมการอย่างเดียว","แสดงข้อความยาว ๆ"], a:0 },
+    { q:"กราฟวงกลมเหมาะกับการแสดงข้อมูลแบบใด", opts:["สัดส่วนของแต่ละส่วนเมื่อเทียบกับทั้งหมด","การเปลี่ยนแปลงตามเวลาอย่างละเอียด","ค่าความสูงของคนแต่ละคน","ขั้นตอนการคำนวณ"], a:0 },
+    { q:"Range (พิสัย) หาได้จากอะไร", opts:["ค่าสูงสุดลบค่าต่ำสุด","ค่าต่ำสุดลบค่าสูงสุด","ผลรวมหารจำนวนข้อมูล","ค่าที่พบมากที่สุด"], a:0 },
+    { q:"ถ้าข้อมูลมีค่าผิดปกติ (Outlier) มาก ควรพิจารณาค่ากลางใด", opts:["มัธยฐาน","ค่าเฉลี่ย","ค่าสูงสุด","พิสัย"], a:0 },
+    { q:"ความน่าจะเป็นหมายถึงอะไร", opts:["โอกาสที่เหตุการณ์หนึ่งจะเกิดขึ้น","จำนวนข้อมูลทั้งหมด","ค่าที่พบมากที่สุด","ผลรวมของข้อมูล"], a:0 },
+    { q:"ข้อใดเป็นเหตุการณ์ที่เป็นไปไม่ได้", opts:["ทอยลูกเต๋า 6 หน้าแล้วได้ 7","ทอยลูกเต๋าแล้วได้ 3","โยนเหรียญแล้วได้หัว","พรุ่งนี้มีพระอาทิตย์ขึ้น"], a:0 },
+    { q:"ข้อใดเป็นเหตุการณ์ที่แน่นอน", opts:["จำนวนจุดบนลูกเต๋า 6 หน้าเป็น 1 ถึง 6","ทอยลูกเต๋าแล้วได้ 7","โยนเหรียญแล้วได้ทั้งหัวและก้อยพร้อมกัน","สุ่มเลข 1–10 แล้วได้ 20"], a:0 },
+    { q:"การสุ่มตัวอย่างคืออะไร", opts:["การเลือกบางส่วนของประชากรเพื่อศึกษา","การเก็บข้อมูลจากทุกคนเสมอ","การเลือกเฉพาะคนที่รู้จัก","การลบข้อมูลที่ไม่ต้องการ"], a:0 },
+    { q:"การนับความถี่คืออะไร", opts:["การนับจำนวนครั้งที่ค่าหรือเหตุการณ์ปรากฏ","การหาค่าเฉลี่ย","การหาค่ามัธยฐาน","การเรียงข้อมูลจากมากไปน้อยเท่านั้น"], a:0 },
+    { q:"กราฟเส้นเหมาะกับข้อมูลแบบใด", opts:["ข้อมูลที่เปลี่ยนแปลงตามเวลา","ข้อมูลสีของเสื้อเท่านั้น","ข้อมูลชื่อคนเท่านั้น","ข้อมูลที่ไม่มีลำดับเวลา"], a:0 },
+    { q:"ทำไมต้องจัดระเบียบข้อมูลก่อนวิเคราะห์", opts:["เพื่อให้อ่าน เปรียบเทียบ และวิเคราะห์ได้ง่ายขึ้น","เพื่อเพิ่มจำนวนข้อมูล","เพื่อทำให้ข้อมูลถูกต้องโดยอัตโนมัติ","เพื่อไม่ต้องใช้กราฟ"], a:0 },
+    { q:"ข้อมูลช่วยในการตัดสินใจอย่างไร", opts:["ช่วยให้ตัดสินใจโดยมีหลักฐานและเหตุผลมากขึ้น","ทำให้ไม่ต้องคิดก่อนตัดสินใจ","ทำให้ทุกการตัดสินใจถูกต้อง 100%","ใช้แทนความคิดเห็นได้ทุกกรณี"], a:0 },
+
+    // ช่อง 31–50: ยากขึ้น
+    { q:"ค่าเฉลี่ยของ 2, 4, 6 คือ", opts:["3","4","5","6"], a:1 },
+    { q:"มัธยฐานของ 1, 3, 5 คือ", opts:["1","3","5","4"], a:1 },
+    { q:"ฐานนิยมของ 2, 2, 3 คือ", opts:["2","3","1","ไม่มี"], a:0 },
+    { q:"ข้อมูลใดเป็นเชิงคุณภาพ", opts:["อายุ","ส่วนสูง","สี","น้ำหนัก"], a:2 },
+    { q:"ข้อมูลใดเป็นเชิงปริมาณ", opts:["เพศ","สี","คะแนนสอบ","ประเภท"], a:2 },
+    { q:"กราฟวงกลมใช้แสดง", opts:["เวลา","สัดส่วน","ความเร็ว","ระยะทาง"], a:1 },
+    { q:"Range ของ 2, 5, 9 คือ", opts:["5","6","7","9"], a:2 },
+    { q:"ความน่าจะเป็นสูงสุดคือ", opts:["0","0.5","1","10"], a:2 },
+    { q:"เหตุการณ์ที่เป็นไปไม่ได้มีค่า", opts:["0","1","0.5","-1"], a:0 },
+    { q:"กราฟแท่งใช้", opts:["เปรียบเทียบ","วัดเวลา","วัดน้ำหนัก","วาดรูป"], a:0 },
+    { q:"ค่าเฉลี่ยของ 10, 20 คือ", opts:["10","15","20","25"], a:1 },
+    { q:"มัธยฐานของ 2, 4, 6, 8 คือ", opts:["4","5","6","8"], a:1 },
+    { q:"Mode ของ 1, 2, 3 คือ", opts:["1","2","3","ไม่มี"], a:3 },
+    { q:"ข้อใดคือการสุ่ม", opts:["เลือกเพื่อนสนิท","จับฉลาก","เลือกคนเก่ง","เลือกคนรู้จัก"], a:1 },
+    { q:"กราฟเส้นเหมาะกับ", opts:["เวลา","สี","เพศ","รูปภาพ"], a:0 },
+    { q:"ข้อมูลช่วยให้เรา", opts:["เดา","ตัดสินใจ","เล่นเกม","วาดรูป"], a:1 },
+    { q:"การเก็บข้อมูลจากบางส่วนเรียกว่า", opts:["สำมะโน","ตัวอย่าง","ค่ากลาง","กราฟ"], a:1 },
+    { q:"ค่าเฉลี่ยคือ", opts:["ค่าสูงสุด","ค่ากลาง","ค่าต่ำสุด","ค่าแรก"], a:1 },
+    { q:"Median คือ", opts:["ค่ามากสุด","ค่ากลาง","ค่าน้อยสุด","ค่าเฉลี่ย"], a:1 },
+    { q:"Mode คือ", opts:["ค่าที่พบมากสุด","ค่ากลาง","ค่าน้อยสุด","ค่าสุ่ม"], a:0 }
+  ];
+  let customQuestions = [];
+
+  const PLAYER_COLORS = ['#DD5C56','#5F8D4E','#3B7DAE','#9B6BC7','#E2933B','#4FA8A0'];
+  const MAX_PLAYERS = 6;
+
+  // ---------- Game state ----------
+  let players = [];      // {id,name,position,correct,wrong,finished,color}
+  let nextPlayerId = 1;
+  let currentPlayerIndex = 0;
+  let gameStarted = false;
+  let busy = false;
+  let finishOrder = [];  // player ids, in order of finishing
+
+  // ---------- DOM refs ----------
+  const boardEl = document.getElementById('board');
+  const answerBtn = document.getElementById('answerBtn');
+  const messageEl = document.getElementById('message');
+  const overlay = document.getElementById('overlay');
+  const qtext = document.getElementById('qtext');
+  const qPlayerName = document.getElementById('qPlayerName');
+  const qPlayerDot = document.getElementById('qPlayerDot');
+  const optionsEl = document.getElementById('options');
+  const qfeedback = document.getElementById('qfeedback');
+  const winOverlay = document.getElementById('winOverlay');
+  const winTitle = document.getElementById('winTitle');
+  const leaderboardEl = document.getElementById('leaderboard');
+  const confettiEl = document.getElementById('confetti');
+  const playerListEl = document.getElementById('playerList');
+  const playerSetupControls = document.getElementById('playerSetupControls');
+  const playerPostControls = document.getElementById('playerPostControls');
+  const playerSetupMsg = document.getElementById('playerSetupMsg');
+  const turnIndicator = document.getElementById('turnIndicator');
+
+  // ---------- Build board tiles ----------
+  const tileEls = [];
+  const tokenHolders = [];
+  for(let i=0;i<TOTAL;i++){
+    const div = document.createElement('div');
+    div.className = 'tile' + (tiles[i].corner ? ' corner' : '');
+    const label = tiles[i].corner ? (tiles[i].icon + '<br>' + tiles[i].name) : tiles[i].name;
+    div.innerHTML = '<span class="idx">'+(i+1)+'</span>' + label;
+
+    let row, col;
+    if(i <= 14){ row = 12; col = 1 + i; }
+    else if(i <= 25){ row = 26 - i; col = 15; }
+    else if(i <= 39){ row = 1; col = 40 - i; }
+    else { row = i - 38; col = 1; }
+
+    div.style.gridRow = row;
+    div.style.gridColumn = col;
+
+    const holder = document.createElement('div');
+    holder.className = 'token-holder';
+    div.appendChild(holder);
+
+    boardEl.appendChild(div);
+    tileEls[i] = div;
+    tokenHolders[i] = holder;
+  }
+
+  function renderTokens(){
+    tokenHolders.forEach(h => h.innerHTML = '');
+    tileEls.forEach(t => t.classList.remove('active-tile'));
+    players.forEach((p, idx) => {
+      const span = document.createElement('span');
+      span.className = 'ptoken';
+      span.style.background = p.color;
+      span.textContent = (idx+1);
+      span.title = p.name;
+      tokenHolders[p.position].appendChild(span);
+    });
+    if(gameStarted && players.length){
+      const cp = players[currentPlayerIndex];
+      if(cp) tileEls[cp.position].classList.add('active-tile');
+    }
+  }
+
+  function setMessage(text, cls){
+    messageEl.textContent = text || '';
+    messageEl.className = 'message' + (cls ? ' '+cls : '');
+  }
+
+  function sleep(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+  // ---------- Player setup UI ----------
+  function makeDefaultPlayer(){
+    const p = { id: nextPlayerId++, name: 'ผู้เล่น ' + players.length, position:0, correct:0, wrong:0, finished:false, color: PLAYER_COLORS[players.length % PLAYER_COLORS.length] };
+    return p;
+  }
+
+  function addPlayer(){
+    if(players.length >= MAX_PLAYERS){
+      playerSetupMsg.textContent = 'เพิ่มผู้เล่นได้สูงสุด ' + MAX_PLAYERS + ' คน';
+      return;
+    }
+    players.push(makeDefaultPlayer());
+    playerSetupMsg.textContent = '';
+    renderPlayerList();
+  }
+
+  function removePlayer(id){
+    players = players.filter(p => p.id !== id);
+    renderPlayerList();
+  }
+
+  function renderPlayerList(){
+    playerListEl.innerHTML = '';
+    players.forEach((p, idx) => {
+      const row = document.createElement('div');
+      row.className = 'player-row' + (gameStarted && idx===currentPlayerIndex && !p.finished ? ' current-turn' : '') + (p.finished ? ' finished' : '');
+
+      const dot = document.createElement('div');
+      dot.className = 'player-color-dot';
+      dot.style.background = p.color;
+      row.appendChild(dot);
+
+      if(!gameStarted){
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'player-name-input';
+        input.value = p.name;
+        input.placeholder = 'ชื่อผู้เล่น ' + (idx+1);
+        input.addEventListener('input', () => { p.name = input.value; });
+        row.appendChild(input);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'remove-player-btn';
+        delBtn.textContent = '✕';
+        delBtn.title = 'ลบผู้เล่นนี้';
+        delBtn.addEventListener('click', () => removePlayer(p.id));
+        if(players.length > 1) row.appendChild(delBtn);
+      } else {
+        const nameEl = document.createElement('div');
+        nameEl.className = 'player-name-static';
+        nameEl.textContent = p.name + (p.finished ? ' 🎉' : '');
+        row.appendChild(nameEl);
+
+        const stats = document.createElement('div');
+        stats.className = 'player-stats-inline';
+        stats.innerHTML = 'ช่อง <b>' + (p.position+1) + '</b>/' + TOTAL + ' &nbsp; ถูก <b>' + p.correct + '</b> &nbsp; ผิด <b>' + p.wrong + '</b>';
+        row.appendChild(stats);
+      }
+
+      playerListEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('addPlayerBtn').addEventListener('click', addPlayer);
+
+  document.getElementById('startGameBtn').addEventListener('click', () => {
+    if(players.length === 0){
+      playerSetupMsg.textContent = 'เพิ่มผู้เล่นอย่างน้อย 1 คนก่อนเริ่มเกม';
+      return;
+    }
+    players.forEach((p, idx) => { if(!p.name.trim()) p.name = 'ผู้เล่น ' + (idx+1); });
+    gameStarted = true;
+    currentPlayerIndex = 0;
+    playerSetupControls.style.display = 'none';
+    playerPostControls.style.display = 'flex';
+    playerSetupMsg.textContent = '';
+    turnIndicator.style.display = 'flex';
+    answerBtn.disabled = false;
+    answerBtn.textContent = 'ตอบคำถาม';
+    renderPlayerList();
+    renderTokens();
+    updateTurnIndicator();
+    setMessage('เริ่มเกมแล้ว! ' + players[0].name + ' ตอบคำถามข้อแรกได้เลย', 'info');
+  });
+
+  document.getElementById('editPlayersBtn').addEventListener('click', () => {
+    if(!confirm('การแก้ไขผู้เล่นจะรีเซ็ตความคืบหน้าทั้งหมด ยืนยันหรือไม่?')) return;
+    gameStarted = false;
+    busy = false;
+    finishOrder = [];
+    players.forEach(p => { p.position = 0; p.correct = 0; p.wrong = 0; p.finished = false; });
+    currentPlayerIndex = 0;
+    playerSetupControls.style.display = 'flex';
+    playerPostControls.style.display = 'none';
+    turnIndicator.style.display = 'none';
+    answerBtn.disabled = true;
+    answerBtn.textContent = 'เริ่มเกมก่อนนะ';
+    hideOverlay(winOverlay);
+    setMessage('', '');
+    renderPlayerList();
+    renderTokens();
+  });
+
+  function updateTurnIndicator(){
+    if(!gameStarted || players.length === 0) return;
+    const cp = players[currentPlayerIndex];
+    if(!cp){ turnIndicator.style.display = 'none'; return; }
+    turnIndicator.innerHTML = '<span class="dot" style="background:' + cp.color + '"></span> ตาของ: ' + escapeHtml(cp.name);
+    renderPlayerList();
+  }
+
+  // init solo mode automatically
+  players.push(makeDefaultPlayer());
+  players[0].name = 'ผู้เล่น';
+  gameStarted = true;
+  currentPlayerIndex = 0;
+  renderPlayerList();
+  renderTokens();
+  updateTurnIndicator();
+  answerBtn.disabled = false;
+  answerBtn.textContent = 'ตอบคำถาม';
+  setMessage('พร้อมเล่น! กด “ตอบคำถาม” เพื่อเริ่มเกม', 'info');
+
+  // ---------- Question flow ----------
+  function activePool(){
+    const useDefault = document.getElementById('useDefaultToggle').checked;
+    let pool = [];
+    if(useDefault) pool = pool.concat(DEFAULT_QUESTIONS);
+    pool = pool.concat(customQuestions);
+    if(pool.length === 0) pool = DEFAULT_QUESTIONS;
+    return pool;
+  }
+  function questionForCurrentTile(){
+    const cp = players[currentPlayerIndex];
+    const useDefault = document.getElementById('useDefaultToggle').checked;
+    if(useDefault && DEFAULT_QUESTIONS[cp.position]) return DEFAULT_QUESTIONS[cp.position];
+    if(customQuestions.length) return customQuestions[cp.position % customQuestions.length];
+    return DEFAULT_QUESTIONS[cp.position] || DEFAULT_QUESTIONS[0];
+  }
+
+  function showOverlay(el){ el.classList.add('show'); }
+  function hideOverlay(el){ el.classList.remove('show'); }
+
+  function openQuestion(){
+    const cp = players[currentPlayerIndex];
+    qPlayerName.textContent = "ช่อง " + (cp.position + 1) + " — " + cp.name;
+    qPlayerDot.style.background = cp.color;
+
+    const q = questionForCurrentTile();
+    const qDifficulty = document.getElementById('qDifficulty');
+    if(qDifficulty){
+      const n = cp.position + 1;
+      qDifficulty.textContent = n <= 10 ? '• ง่าย' : (n <= 30 ? '• ปานกลาง' : '• ยาก');
+    }
+    qtext.textContent = q.q;
+    qfeedback.textContent = '';
+    qfeedback.className = 'qfeedback';
+    optionsEl.innerHTML = '';
+
+    q.opts.forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'opt-btn';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => handleAnswer(idx, q.a, btn));
+      optionsEl.appendChild(btn);
+    });
+
+    showOverlay(overlay);
+  }
+
+  async function handleAnswer(pickedIdx, correctIdx, btnEl){
+    const allBtns = optionsEl.querySelectorAll('.opt-btn');
+    allBtns.forEach(b => b.disabled = true);
+    const cp = players[currentPlayerIndex];
+
+    if(pickedIdx === correctIdx){
+      btnEl.classList.add('correct-pick');
+      qfeedback.textContent = (cp.position === TOTAL - 1) ? 'ถูกต้อง! 🎉 ผ่านเส้นชัยแล้ว' : 'ถูกต้อง! เดินหน้า 1 ช่อง';
+      qfeedback.className = 'qfeedback correct';
+      cp.correct++;
+
+      await sleep(500);
+      hideOverlay(overlay);
+
+      // ถ้าอยู่ช่อง 50 แล้วตอบถูก ให้จบเกมโดยไม่ต้องเดินต่อ
+      if(cp.position === TOTAL - 1){
+        cp.finished = true;
+        finishOrder.push(cp.id);
+        renderTokens();
+        renderPlayerList();
+        setMessage('🎉 ' + cp.name + ' ตอบคำถามช่อง 50 ถูกต้อง และเข้าเส้นชัยแล้ว!', 'correct');
+        await sleep(600);
+        nextTurn();
+        return;
+      }
+
+      cp.position = Math.min(cp.position + 1, TOTAL - 1);
+      renderTokens();
+      renderPlayerList();
+      setMessage(cp.name + ' ตอบถูก! เดินไปช่อง ' + (cp.position+1), 'correct');
+      await sleep(250);
+
+      // ช่อง 50 มีคำถามของตัวเองด้วย: ต้องตอบคำถามประจำช่อง 50 ให้ถูกจึงจะจบเกม
+      if(cp.position === TOTAL - 1){
+        setMessage('🌻 ถึงช่อง 50 แล้ว! ตอบคำถามประจำช่องสุดท้ายเพื่อเข้าเส้นชัย', 'correct');
+      }
+    } else {
+      btnEl.classList.add('wrong-pick');
+      allBtns[correctIdx].classList.add('correct-pick');
+      qfeedback.textContent = 'ผิด! รอ 1 วินาที แล้วผลัดตาถัดไป...';
+      qfeedback.className = 'qfeedback wrong';
+      cp.wrong++;
+
+      await sleep(1000);
+      hideOverlay(overlay);
+      setMessage(cp.name + ' ตอบผิด รอครบ 1 วินาทีแล้ว ผลัดตาถัดไป', 'wrong');
+      renderPlayerList();
+      await sleep(200);
+    }
+
+    nextTurn();
+  }
+
+  function allFinished(){
+    return players.length > 0 && players.every(p => p.finished);
+  }
+
+  function nextTurn(){
+    if(allFinished()){
+      busy = false;
+      answerBtn.disabled = true;
+      showFinalOverlay();
+      return;
+    }
+    const n = players.length;
+    for(let k=1;k<=n;k++){
+      const cand = (currentPlayerIndex + k) % n;
+      if(!players[cand].finished){ currentPlayerIndex = cand; break; }
+    }
+    updateTurnIndicator();
+    renderTokens();
+    busy = false;
+    answerBtn.disabled = false;
+  }
+
+  answerBtn.addEventListener('click', () => {
+    if(busy || !gameStarted) return;
+    if(allFinished()) return;
+    busy = true;
+    answerBtn.disabled = true;
+    setMessage('');
+    openQuestion();
+  });
+
+  function showFinalOverlay(){
+    winTitle.textContent = players.length > 1 ? 'เย้! เกมจบแล้ว 🎉' : 'เย้! คุณผ่านแล้ว 🎉';
+    const ranked = finishOrder.map(id => players.find(p => p.id === id)).filter(Boolean);
+    leaderboardEl.innerHTML = '';
+    ranked.forEach((p, idx) => {
+      const row = document.createElement('div');
+      row.className = 'lb-row';
+      row.innerHTML =
+        '<div class="lb-rank">' + (idx+1) + '</div>' +
+        '<div class="lb-dot" style="background:' + p.color + '"></div>' +
+        '<div class="lb-name">' + escapeHtml(p.name) + '</div>' +
+        '<div class="lb-stats">ถูก ' + p.correct + ' • ผิด ' + p.wrong + '</div>';
+      leaderboardEl.appendChild(row);
+    });
+    showOverlay(winOverlay);
+    launchConfetti();
+  }
+
+  function launchConfetti(){
+    confettiEl.innerHTML = '';
+    const colors = ['#F6D66B','#DD5C56','#7FAF63','#FFF8EC','#8B6239'];
+    for(let i=0;i<60;i++){
+      const s = document.createElement('span');
+      s.style.left = Math.random()*100 + '%';
+      s.style.background = colors[Math.floor(Math.random()*colors.length)];
+      s.style.animationDuration = (2.5 + Math.random()*2.5) + 's';
+      s.style.animationDelay = (Math.random()*1.5) + 's';
+      confettiEl.appendChild(s);
+    }
+  }
+
+  document.getElementById('againBtn').addEventListener('click', () => {
+    finishOrder = [];
+    players.forEach(p => { p.position = 0; p.correct = 0; p.wrong = 0; p.finished = false; });
+    currentPlayerIndex = 0;
+    busy = false;
+    answerBtn.disabled = false;
+    hideOverlay(winOverlay);
+    setMessage('');
+    renderTokens();
+    renderPlayerList();
+    updateTurnIndicator();
+  });
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ---------- Question settings panel (custom questions) ----------
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const qlistEl = document.getElementById('qlist');
+  const customCountLabel = document.getElementById('customCountLabel');
+  const addQMsg = document.getElementById('addQMsg');
+  const ioMsg = document.getElementById('ioMsg');
+
+  openSettingsBtn.addEventListener('click', () => showOverlay(settingsOverlay));
+  closeSettingsBtn.addEventListener('click', () => hideOverlay(settingsOverlay));
+  settingsOverlay.addEventListener('click', (e) => { if(e.target === settingsOverlay) hideOverlay(settingsOverlay); });
+
+  function renderQList(){
+    customCountLabel.textContent = customQuestions.length;
+    if(customQuestions.length === 0){
+      qlistEl.innerHTML = '<div class="qlist-empty">ยังไม่มีคำถามที่เพิ่มเอง</div>';
+      return;
+    }
+    qlistEl.innerHTML = '';
+    customQuestions.forEach((cq, idx) => {
+      const item = document.createElement('div');
+      item.className = 'qlist-item';
+      item.innerHTML = '<div class="qtxt">' + escapeHtml(cq.q) + '<small>ถูก: ' + escapeHtml(cq.opts[cq.a]) + '</small></div>';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'ลบคำถามนี้';
+      delBtn.addEventListener('click', () => { customQuestions.splice(idx, 1); renderQList(); });
+      item.appendChild(delBtn);
+      qlistEl.appendChild(item);
+    });
+  }
+
+  document.getElementById('addQBtn').addEventListener('click', () => {
+    const qVal = document.getElementById('newQText').value.trim();
+    const opts = [0,1,2,3].map(i => document.getElementById('newOpt'+i).value.trim());
+    const correctRadio = document.querySelector('input[name=newQCorrect]:checked');
+    const correctIdx = parseInt(correctRadio.value, 10);
+
+    if(!qVal || opts.some(o => !o)){
+      addQMsg.textContent = 'กรุณากรอกคำถามและตัวเลือกให้ครบทั้ง 4 ข้อ';
+      addQMsg.className = 'io-msg err';
+      return;
+    }
+
+    customQuestions.push({ q: qVal, opts: opts, a: correctIdx });
+    renderQList();
+
+    document.getElementById('newQText').value = '';
+    [0,1,2,3].forEach(i => document.getElementById('newOpt'+i).value = '');
+    document.querySelector('input[name=newQCorrect][value="0"]').checked = true;
+
+    addQMsg.textContent = 'เพิ่มคำถามเรียบร้อยแล้ว';
+    addQMsg.className = 'io-msg ok';
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    const json = JSON.stringify(customQuestions, null, 2);
+    document.getElementById('rawArea').value = json;
+    try{
+      await navigator.clipboard.writeText(json);
+      ioMsg.textContent = 'คัดลอกชุดคำถาม (' + customQuestions.length + ' ข้อ) ไปยังคลิปบอร์ดแล้ว';
+      ioMsg.className = 'io-msg ok';
+    }catch(e){
+      ioMsg.textContent = 'คัดลอกอัตโนมัติไม่ได้ แต่แสดงข้อความไว้ในช่องด้านล่างแล้ว ลอกได้เลย';
+      ioMsg.className = 'io-msg ok';
+    }
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    const raw = document.getElementById('rawArea').value.trim();
+    if(!raw){
+      ioMsg.textContent = 'วางข้อความ JSON ในช่องก่อนนำเข้า';
+      ioMsg.className = 'io-msg err';
+      return;
+    }
+    try{
+      const parsed = JSON.parse(raw);
+      if(!Array.isArray(parsed)) throw new Error('ไม่ใช่ลิสต์');
+      const valid = parsed.filter(item =>
+        item && typeof item.q === 'string' &&
+        Array.isArray(item.opts) && item.opts.length === 4 &&
+        Number.isInteger(item.a) && item.a >= 0 && item.a <= 3
+      );
+      if(valid.length === 0) throw new Error('ไม่พบคำถามที่ถูกต้อง');
+      customQuestions = customQuestions.concat(valid);
+      renderQList();
+      ioMsg.textContent = 'นำเข้าสำเร็จ ' + valid.length + ' ข้อ';
+      ioMsg.className = 'io-msg ok';
+    }catch(e){
+      ioMsg.textContent = 'รูปแบบ JSON ไม่ถูกต้อง กรุณาตรวจสอบข้อความที่วาง';
+      ioMsg.className = 'io-msg err';
+    }
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    customQuestions = [];
+    renderQList();
+    ioMsg.textContent = 'ล้างคำถามที่เพิ่มเองทั้งหมดแล้ว';
+    ioMsg.className = 'io-msg ok';
+  });
+
+  renderQList();
+
+})();
+</script>
+
+</body>
+</html>
